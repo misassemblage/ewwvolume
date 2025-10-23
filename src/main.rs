@@ -3,28 +3,26 @@ use window::Window;
 
 use crate::eww::var;
 fn main() {
-    run_args();
-    if let Ok(server) = server::try_connect() {
-        server::try_update(server, volume)
-    } else {
-        let window = Window::new();
-        server::start_with_window(window);
-    }
+
 }
 
-fn run_args() {
-    let mut args = env::args();
-    if args.len() > 1 {
-        match &*args.nth(1).unwrap() {
-            "up" => wpctl::plus_two(),
-            "down" => wpctl::minus_two(),
-            "mute-toggle" => wpctl::mute_toggle(),
-            _ => panic!("unexpected argument"),
-        }
-        eww::update(var::VOLUME_LEVEL, (wpctl::get_vol().level * 100.0) as u8);
+pub enum Action {
+    Up,
+    Down,
+    MuteToggle
+}
+fn parse_args() -> Action {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        panic!("no arguments provided");
+    }
+    match args[1].as_str() {
+        "up" => Action::Up,
+        "down" => Action::Down,
+        "mute-toggle" => Action::MuteToggle,
+        _ => panic!("unexpected argument: {}", args[1]),
     }
 }
-
 pub struct CachedVolume {
     pub level: f32,
     pub is_muted: bool,
@@ -54,6 +52,8 @@ impl From<wpctl::WpctlVolume> for CachedVolume {
 
 mod wpctl {
     use std::process::Command;
+
+    use crate::Action;
     pub struct WpctlVolume {
         pub level: f32,
         pub is_muted: bool,
@@ -81,27 +81,27 @@ mod wpctl {
         }
         WpctlVolume { level, is_muted }
     }
-    pub fn plus_two() {
-        Command::new("wpctl")
-            .args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"])
-            .output()
-            .unwrap();
-        Command::new("wpctl")
-            .args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02+", "-l", "1"])
-            .output()
-            .unwrap();
-    }
-    pub fn minus_two() {
-        Command::new("wpctl")
-            .args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02-", "-l", "1"])
-            .output()
-            .unwrap();
-    }
-    pub fn mute_toggle() {
-        Command::new("wpctl")
-            .args(["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
-            .output()
-            .unwrap();
+    pub fn match_command(action: Action) -> Result<Vec<Command>, &'static str> {
+        match action {
+            Action::Up => {
+                let mut cmd1 = Command::new("wpctl");
+                cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"]);
+                let mut cmd2 = Command::new("wpctl");
+                cmd2.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02+","-l","1"])
+                Ok(vec![cmd1,cmd2])
+            }
+            Action::Down => {
+                let cmd1 = Command::new("wpctl");
+                cmd1.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02-", "-l", "1"]);
+                Ok(vec![cmd1])
+            }
+            Action::MuteToggle => {
+                let cmd1 = Command::new("wpctl");
+                cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
+                Ok(vec![cmd1])
+            }
+            _ => Err("invalid arguments!"),
+        }
     }
 }
 mod eww {
