@@ -1,15 +1,55 @@
-use std::env;
+use std::{env, process::Output};
 use window::Window;
 
 use crate::eww::var;
 fn main() {
-
+    let action = parse_args();
+    if let Ok(server) = server::try_connect() {
+        server::try_update(&server, action).unwrap();
+        std::process::exit(1);
+    } else {
+        server::start_with_window(Window::new());
+        action.run().unwrap();
+    }
 }
 
 pub enum Action {
     Up,
     Down,
-    MuteToggle
+    MuteToggle,
+}
+impl Action {
+    fn run(self) -> Result<Self, std::io::Error> {
+        match self {
+            Self::Up => {
+                wpctl::vol_up()?;
+                Ok(Self::Up)
+            }
+            Self::Down => {
+                wpctl::vol_down()?;
+                Ok(Self::Down)
+            }
+
+            Self::MuteToggle => {
+                wpctl::mute_toggle()?;
+                Ok(Self::MuteToggle)
+            }
+        }
+    }
+    fn to_bytes(&self) -> [u8; 1] {
+        match self {
+            Self::Up => [0b00000000],
+            Self::Down => [0b11111111],
+            Self::MuteToggle => [0b10101010],
+        }
+    }
+    fn from_bytes(bytes: &[u8; 1]) -> Self {
+        match bytes {
+            [0] => Self::Up,
+            [255] => Self::Down,
+            _ => Self::MuteToggle,
+        }
+    }
 }
 fn parse_args() -> Action {
     let args: Vec<String> = env::args().collect();
@@ -28,6 +68,23 @@ pub struct CachedVolume {
     pub is_muted: bool,
 }
 impl CachedVolume {
+    fn update_from(&mut self, action: Action) -> () {
+        match action {
+            Action::Up => {
+                self.level += 2.0;
+                self.is_muted = false;
+            }
+            Action::Down => self.level -= 2.0,
+            Action::MuteToggle => self.toggle(),
+        }
+    }
+    fn toggle(&mut self) {
+        if self.is_muted {
+            self.is_muted = false;
+        } else {
+            self.is_muted = true;
+        }
+    }
     fn to_bytes(&self) -> [u8; 5] {
         let mut bytes = [0u8; 5];
         bytes[0..4].copy_from_slice(&self.level.to_le_bytes());
@@ -51,7 +108,10 @@ impl From<wpctl::WpctlVolume> for CachedVolume {
 }
 
 mod wpctl {
-    use std::process::Command;
+    use std::{
+        io::Error,
+        process::{Command, Output},
+    };
 
     use crate::Action;
     pub struct WpctlVolume {
@@ -81,22 +141,40 @@ mod wpctl {
         }
         WpctlVolume { level, is_muted }
     }
+    pub fn vol_up() -> Result<Output, std::io::Error> {
+        let mut cmd1 = Command::new("wpctl");
+        cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"]);
+        let mut cmd2 = Command::new("wpctl");
+        cmd2.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02+", "-l", "1"]);
+        cmd1.output()?;
+        cmd2.output()
+    }
+    pub fn vol_down() -> Result<Output, std::io::Error> {
+        let mut cmd1 = Command::new("wpctl");
+        cmd1.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02-", "-l", "1"]);
+        cmd1.output()
+    }
+    pub fn mute_toggle() -> Result<Output, std::io::Error> {
+        let mut cmd1 = Command::new("wpctl");
+        cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
+        cmd1.output()
+    }
     pub fn match_command(action: Action) -> Result<Vec<Command>, &'static str> {
         match action {
             Action::Up => {
                 let mut cmd1 = Command::new("wpctl");
                 cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"]);
                 let mut cmd2 = Command::new("wpctl");
-                cmd2.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02+","-l","1"])
-                Ok(vec![cmd1,cmd2])
+                cmd2.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02+", "-l", "1"]);
+                Ok(vec![cmd1, cmd2])
             }
             Action::Down => {
-                let cmd1 = Command::new("wpctl");
+                let mut cmd1 = Command::new("wpctl");
                 cmd1.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02-", "-l", "1"]);
                 Ok(vec![cmd1])
             }
             Action::MuteToggle => {
-                let cmd1 = Command::new("wpctl");
+                let mut cmd1 = Command::new("wpctl");
                 cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
                 Ok(vec![cmd1])
             }
@@ -183,11 +261,8 @@ mod server {
             Err("server not found")
         }
     }
-    pub fn try_update(
-        mut stream: &UnixStream,
-        volume: &CachedVolume,
-    ) -> Result<(), Box<dyn Error>> {
-        stream.write_all(&volume.to_bytes())?;
+    pub fn try_update(mut stream: &UnixStream, action: Action) -> Result<(), Box<dyn Error>> {
+        stream.write_all(&action.to_bytes())?;
         Ok(())
     }
     pub fn start_with_window(mut window: super::Window) {
@@ -199,9 +274,10 @@ mod server {
         //listener loop
         loop {
             if let Ok((mut stream, _)) = listener.accept() {
-                let mut buffer = [0; 5];
+                let mut buffer = [0; 1];
                 if let Ok(n) = stream.read(&mut buffer) {
-                    volume = CachedVolume::from_bytes(&buffer);
+                    let action = Action::from_bytes(&buffer);
+                    volume.update_from(action.run().expect("wpctl call failed!"));
                     window::update_icon(&volume);
                     eww::update(eww::var::VOLUME_LEVEL, volume.level);
                     window.reset();
@@ -211,7 +287,7 @@ mod server {
                 window.kill();
                 break;
             }
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(1));
         }
     }
 }
