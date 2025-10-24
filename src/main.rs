@@ -6,7 +6,7 @@ fn main() {
     let action = parse_args();
     if let Ok(server) = server::try_connect() {
         server::try_update(&server, action).unwrap();
-        std::process::exit(1);
+        std::process::exit(0);
     } else {
         server::start_with_window(Window::new());
         action.run().unwrap();
@@ -203,10 +203,10 @@ mod eww {
 
 mod resource {
     pub mod icon {
-        pub const MUTE: &'static str = "$HOME/.config/eww/resources/volume-mute.png";
-        pub const LOW: &'static str = "$HOME/.config/eww/resources/volume-low.png";
-        pub const MID: &'static str = "$HOME/.config/eww/resources/volume-mid.png";
-        pub const HIGH: &'static str = "$HOME/.config/eww/resources/volume-high.png";
+        pub const MUTE: &'static str = "/home/annie/.config/eww/resources/volume-mute.png";
+        pub const LOW: &'static str = "/home/annie/.config/eww/resources/volume-low.png";
+        pub const MID: &'static str = "/home/annie/.config/eww/resources/volume-mid.png";
+        pub const HIGH: &'static str = "/home/annie/.config/eww/resources/volume-high.png";
     }
 }
 
