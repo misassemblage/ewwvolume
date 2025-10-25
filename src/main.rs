@@ -7,8 +7,8 @@ fn main() {
         server::try_update(&server, action).unwrap();
         std::process::exit(0);
     } else {
-        server::start_with_window(Window::new());
         action.run().unwrap();
+        server::start_with_window(Window::new());
     }
 }
 
