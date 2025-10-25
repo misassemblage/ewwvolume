@@ -1,7 +1,6 @@
-use std::{env, process::Output};
+use std::env;
 use window::Window;
 
-use crate::eww::var;
 fn main() {
     let action = parse_args();
     if let Ok(server) = server::try_connect() {
@@ -71,10 +70,14 @@ impl CachedVolume {
     fn update_from(&mut self, action: Action) -> () {
         match action {
             Action::Up => {
-                self.level += 2.0;
+                self.level += 0.02;
+                self.level = self.level.clamp(0.0, 1.0);
                 self.is_muted = false;
             }
-            Action::Down => self.level -= 2.0,
+            Action::Down => {
+                self.level -= 0.02;
+                self.level = self.level.clamp(0.0, 1.0);
+            }
             Action::MuteToggle => self.toggle(),
         }
     }
@@ -83,18 +86,6 @@ impl CachedVolume {
             self.is_muted = false;
         } else {
             self.is_muted = true;
-        }
-    }
-    fn to_bytes(&self) -> [u8; 5] {
-        let mut bytes = [0u8; 5];
-        bytes[0..4].copy_from_slice(&self.level.to_le_bytes());
-        bytes[4] = self.is_muted as u8;
-        bytes
-    }
-    fn from_bytes(bytes: &[u8; 5]) -> Self {
-        Self {
-            level: f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            is_muted: bytes[4] != 0,
         }
     }
 }
@@ -108,12 +99,7 @@ impl From<wpctl::WpctlVolume> for CachedVolume {
 }
 
 mod wpctl {
-    use std::{
-        io::Error,
-        process::{Command, Output},
-    };
-
-    use crate::Action;
+    use std::process::{Command, Output};
     pub struct WpctlVolume {
         pub level: f32,
         pub is_muted: bool,
@@ -159,35 +145,12 @@ mod wpctl {
         cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
         cmd1.output()
     }
-    pub fn match_command(action: Action) -> Result<Vec<Command>, &'static str> {
-        match action {
-            Action::Up => {
-                let mut cmd1 = Command::new("wpctl");
-                cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"]);
-                let mut cmd2 = Command::new("wpctl");
-                cmd2.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02+", "-l", "1"]);
-                Ok(vec![cmd1, cmd2])
-            }
-            Action::Down => {
-                let mut cmd1 = Command::new("wpctl");
-                cmd1.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02-", "-l", "1"]);
-                Ok(vec![cmd1])
-            }
-            Action::MuteToggle => {
-                let mut cmd1 = Command::new("wpctl");
-                cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
-                Ok(vec![cmd1])
-            }
-            _ => Err("invalid arguments!"),
-        }
-    }
 }
 mod eww {
     use std::{fmt::Display, process::Command};
     pub mod var {
         pub const VOLUME_LEVEL: &'static str = "volume-level=";
         pub const ICON_PATH: &'static str = "volume-icon-path=";
-        pub const COLOR: &'static str = "volcolor=";
     }
     pub fn update(var: &str, val: impl Display) {
         let arg = &format!("{var}{val}");
@@ -211,11 +174,8 @@ mod resource {
 }
 
 mod window {
-    use crate::{CachedVolume, eww, wpctl};
-    use std::{
-        fmt::{Display, Formatter},
-        time,
-    };
+    use crate::{CachedVolume, eww};
+    use std::time;
     pub struct Window(time::Instant);
     impl Window {
         pub fn age(&self) -> time::Duration {
@@ -239,7 +199,7 @@ mod window {
             eww::update(var::ICON_PATH, icon::MUTE);
         } else {
             match volume.level {
-                level if level == 0.0 => eww::update(var::ICON_PATH, icon::MUTE),
+                level if level < 0.01 => eww::update(var::ICON_PATH, icon::MUTE),
                 level if level < 0.33 => eww::update(var::ICON_PATH, icon::LOW),
                 level if level < 0.66 => eww::update(var::ICON_PATH, icon::MID),
                 _ => eww::update(var::ICON_PATH, icon::HIGH),
@@ -275,11 +235,14 @@ mod server {
         loop {
             if let Ok((mut stream, _)) = listener.accept() {
                 let mut buffer = [0; 1];
-                if let Ok(n) = stream.read(&mut buffer) {
+                if let Ok(_) = stream.read(&mut buffer) {
                     let action = Action::from_bytes(&buffer);
                     volume.update_from(action.run().expect("wpctl call failed!"));
                     window::update_icon(&volume);
-                    eww::update(eww::var::VOLUME_LEVEL, volume.level);
+                    eww::update(
+                        eww::var::VOLUME_LEVEL,
+                        format!("{:.2}", volume.level * 100.0),
+                    );
                     window.reset();
                 }
             }
