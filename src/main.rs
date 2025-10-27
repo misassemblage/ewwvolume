@@ -1,5 +1,5 @@
 use data::*;
-use std::env;
+use std::{env, fs};
 use window::VolWindow;
 
 fn main() {
@@ -52,7 +52,7 @@ mod data {
                     Ok(Self::MuteToggle)
                 }
                 Self::MicToggle => {
-                    wpctl::mute_toggle()?;
+                    wpctl::mic_toggle()?;
                     Ok(Self::MicToggle)
                 }
             }
@@ -386,23 +386,24 @@ mod server {
         Ok(())
     }
     pub fn start_server_from(initial_action: Action) {
+        let listener = UnixListener::bind("/tmp/ewwvolume.sock").unwrap();
+        listener.set_nonblocking(true).unwrap();
+
         let mut next_action = Some(initial_action);
         while let Some(action) = next_action {
             next_action = match action {
-                Action::MicToggle => run_window(MicWindow::new()),
-                _ => run_window(VolWindow::new()),
+                Action::MicToggle => run_window(MicWindow::new(), &listener),
+                _ => run_window(VolWindow::new(), &listener),
             };
         }
+        fs::remove_file("/tmp/ewwvolume.sock").ok();
     }
-    pub fn run_window<W>(mut window: W) -> Option<Action>
+    pub fn run_window<W>(mut window: W, listener: &UnixListener) -> Option<Action>
     where
         W: Window,
         W::State: AudioState,
     {
-        fs::remove_file("/tmp/ewwvolume.sock").ok();
         let mut state = W::State::from_system().unwrap();
-        let listener = UnixListener::bind("/tmp/ewwvolume.sock").unwrap();
-        listener.set_nonblocking(true).unwrap();
         loop {
             if let Ok((mut stream, _)) = listener.accept() {
                 let mut buffer = [0; 1];
