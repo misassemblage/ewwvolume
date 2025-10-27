@@ -21,6 +21,7 @@ fn parse_args() -> Action {
         "up" => Action::Up,
         "down" => Action::Down,
         "mute-toggle" => Action::MuteToggle,
+        "mic-toggle" => Action::MicToggle,
         _ => panic!("unexpected argument: {}", args[1]),
     }
 }
@@ -386,6 +387,7 @@ mod server {
         Ok(())
     }
     pub fn start_server_from(initial_action: Action) {
+        fs::remove_file("/tmp/ewwvolume.sock").ok();
         let listener = UnixListener::bind("/tmp/ewwvolume.sock").unwrap();
         listener.set_nonblocking(true).unwrap();
 
@@ -396,7 +398,6 @@ mod server {
                 _ => run_window(VolWindow::new(), &listener),
             };
         }
-        fs::remove_file("/tmp/ewwvolume.sock").ok();
     }
     pub fn run_window<W>(mut window: W, listener: &UnixListener) -> Option<Action>
     where
@@ -404,6 +405,8 @@ mod server {
         W::State: AudioState,
     {
         let mut state = W::State::from_system().unwrap();
+        state.sync_eww();
+        window.update_icon(&state);
         loop {
             if let Ok((mut stream, _)) = listener.accept() {
                 let mut buffer = [0; 1];
@@ -413,9 +416,10 @@ mod server {
                         action.run().unwrap();
                         return Some(action);
                     } else {
+                        action.run().unwrap();
                         state.update_from(action).unwrap();
-                        state.sync_eww();
                         window.update_icon(&state);
+                        state.sync_eww();
                     }
                 }
                 window.reset();
