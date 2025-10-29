@@ -139,13 +139,13 @@ mod data {
         fn update_from(&mut self, action: Action) -> Result<(), &'static str> {
             match action {
                 Action::Up => {
-                    self.level += 0.02;
+                    self.level += 0.03;
                     self.level = self.level.clamp(0.0, 1.0);
                     self.is_muted = false;
                     Ok(())
                 }
                 Action::Down => {
-                    self.level -= 0.02;
+                    self.level -= 0.03;
                     self.level = self.level.clamp(0.0, 1.0);
                     Ok(())
                 }
@@ -234,13 +234,13 @@ mod wpctl {
         let mut cmd1 = Command::new("wpctl");
         cmd1.args(["set-mute", "@DEFAULT_AUDIO_SINK@", "0"]);
         let mut cmd2 = Command::new("wpctl");
-        cmd2.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02+", "-l", "1"]);
+        cmd2.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.03+", "-l", "1"]);
         cmd1.output()?;
         cmd2.output()
     }
     pub fn vol_down() -> Result<Output, std::io::Error> {
         let mut cmd1 = Command::new("wpctl");
-        cmd1.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.02-", "-l", "1"]);
+        cmd1.args(["set-volume", "@DEFAULT_AUDIO_SINK@", "0.03-", "-l", "1"]);
         cmd1.output()
     }
     pub fn mute_toggle() -> Result<Output, std::io::Error> {
