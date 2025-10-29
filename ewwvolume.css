@@ -1,0 +1,38 @@
+window.volume-float {
+  border-radius: 10px;
+  opacity: 0.8;
+}
+.volume-icon {
+}
+.volume-panel {
+  padding: 0px 15px;
+}
+.volume-bar {
+  min-height: 30px;
+  padding-bottom: 5px;
+}
+.volume-bar progressbar {
+  border: 1px solid rgba(0,0,0,0.8);
+  border-radius: 10px;
+}
+.volume-bar progressbar trough {
+  min-width: 150px;
+  min-height: 6px;
+  background-color: rgba(0,0,0,0.8);
+}
+.volume-bar progressbar progress {
+  background-color: #ababab;
+  min-height: 6px;
+  border-radius: 10px 0 0 10px;
+}
+
+window.mic-float {
+  border-radius: 10px;
+  opacity: 0.8;
+}
+.mic-icon {
+  border: transparent;
+}
+.mic-panel {
+  padding: 15px 15px;
+}
