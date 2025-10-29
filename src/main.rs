@@ -405,8 +405,8 @@ mod server {
         W::State: AudioState,
     {
         let mut state = W::State::from_system().unwrap();
-        state.sync_eww();
         window.update_icon(&state);
+        state.sync_eww();
         loop {
             if let Ok((mut stream, _)) = listener.accept() {
                 let mut buffer = [0; 1];
