@@ -1,6 +1,6 @@
 # ewwvolume
 
-volume control widget for eww
+volume control visualizer widget for eww
 
 ## installation
 
