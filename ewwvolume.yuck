@@ -1,0 +1,48 @@
+(defvar mic-state "unset")
+(defvar mic-icon-resource "unset")
+
+(defwindow mic-float
+  :monitor 0
+  :geometry (geometry :x "50%"
+                      :y "50"
+                      :width "200px"
+                      :height "20px"
+                      :anchor "center")
+  :stacking "overlay"
+  :namespace "mic-float"
+  (box :class "mic-panel"
+       :orientation "vertical"
+       :space-evenly true
+       (image :class "mic-icon"
+              :path {"${EWW_CONFIG_DIR}/ewwvolume/assets/${mic-icon-resource}"}
+              :image-width 200
+              :image-height 200)
+                      ))
+
+(defvar volume-level "unset")
+(defvar volume-icon-resource "unset")
+
+(defwindow volume-float
+  :monitor 0
+  :geometry (geometry :x "50%"
+                      :y "50"
+                      :width "200px"
+                      :height "20px"
+                      :anchor "center")
+  :stacking "overlay"
+  :namespace "volume-float"
+  (box :class "volume-panel"
+       :orientation "vertical"
+       :space-evenly false
+       (image :class "volume-icon"
+              :path "${EWW_CONFIG_DIR}/ewwvolume/assets/${volume-icon-resource}"
+              :image-width 200
+              :image-height 200)
+       (box :class "volume-bar"
+            :halign "center"
+            (progress :orientation "horizontal"
+                      :valign "center"
+                      :value volume-level
+                      ))))
+
+
