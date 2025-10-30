@@ -2,6 +2,9 @@
 
 volume control visualizer widget for eww
 
+## dependencies
+eww, wireplumber
+
 ## installation
 
 1. install the binary:
@@ -19,4 +22,12 @@ volume control visualizer widget for eww
    (include "./ewwvolume/ewwvolume.yuck")
 ```
 
-4. paste the contents of ewwvolume.css into your eww.css
+## setup
+the ewwvolume binary is designed to be spawned on key events, it may be convenient to do this through desktop environment or compositor configuration.
+
+## arguments
+the binary must be spawned with an argument
+`up` increase volume 3%
+`down` decrease volume 3%
+`mute-toggle` toggle output mute
+`mic-toggle` toggle input mute
